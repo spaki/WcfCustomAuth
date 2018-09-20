@@ -1,10 +1,5 @@
 ﻿using System;
-using System.ServiceModel;
-using System.ServiceModel.Description;
-using System.ServiceModel.Security;
-using WCFAuth.Contrato;
-using WCFAuth.Servico;
-using WCFAuth.WcfSettings;
+using Topshelf;
 
 namespace WCFAuth
 {
@@ -12,45 +7,20 @@ namespace WCFAuth
     {
         static void Main(string[] args)
         {
-            using (
-                var servidor = new ServiceHost
-                (
-                    typeof(ProdutoService),
-                    new Uri[] { new Uri("http://localhost:7171") }
-                )
-            )
+            HostFactory.Run(configure =>
             {
-                // auth
-                var serviceCredentials = new ServiceCredentials(); 
-                serviceCredentials.UserNameAuthentication.UserNamePasswordValidationMode = UserNamePasswordValidationMode.Custom;
-                serviceCredentials.UserNameAuthentication.CustomUserNamePasswordValidator = new ServiceAuthenticator();
-
-                servidor.Description.Behaviors.Add(serviceCredentials);
-
-                // bind
-                var binding = new BasicHttpBinding();
-                binding.Security.Transport.ClientCredentialType = HttpClientCredentialType.Basic;
-                binding.Security.Mode = BasicHttpSecurityMode.TransportCredentialOnly;
-
-                servidor.AddServiceEndpoint(
-                    typeof(IProdutoService),
-                    binding,
-                    "Produto.svc"
-                );
-
-                // mex
-                servidor.Description.Behaviors.Add(new ServiceMetadataBehavior());
-                servidor.AddServiceEndpoint(
-                    typeof(IMetadataExchange),
-                    MetadataExchangeBindings.CreateMexHttpBinding(),
-                    "mex"
-                );
-
-                servidor.Open();
-                Console.WriteLine("Serviço rodando...");
-                Console.WriteLine("Tecle para finalizar.");
-                Console.ReadKey();
-            }
+                configure.Service<Startup.Startup>(service =>
+                {
+                    service.ConstructUsing(s => new Startup.Startup());
+                    service.WhenStarted(s => s.Start());
+                    service.WhenStopped(s => s.Stop());
+                });
+                
+                configure.RunAsNetworkService(); // windows service account
+                configure.SetServiceName("WCFProdutoService");
+                configure.SetDisplayName("WCFProdutoService");
+                configure.SetDescription("Serviço WCF de Produtos");
+            });
         }
     }
 }
